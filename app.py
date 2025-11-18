@@ -130,8 +130,35 @@ logging.basicConfig(level=logging.INFO)
 
 def process_pdfs(uploaded_files):
     """Função principal para processar múltiplos PDFs"""
-    logging.info("Iniciando processamento de PDFs...")
+    # Inicializa o estado da sessão (crucial para threads)
+    if 'user_id' not in st.session_state:
+        st.session_state.user_id = None
+    if 'username' not in st.session_state:
+        st.session_state.username = None
+    if 'user_name' not in st.session_state:
+        st.session_state.user_name = None
+    if 'user_email' not in st.session_state:
+        st.session_state.user_email = None
+    if 'authentication_status' not in st.session_state:
+        st.session_state.authentication_status = None
+    if 'new_user' not in st.session_state:
+        st.session_state.new_user = False
+    if 'needs_credentials' not in st.session_state:
+        st.session_state.needs_credentials = False
+    if 'needs_spreadsheet_config' not in st.session_state:
+        st.session_state.needs_spreadsheet_config = False
+    if 'processing_status' not in st.session_state:
+        st.session_state.processing_status = None
+    if 'processing_results' not in st.session_state:
+        st.session_state.processing_results = []
+    if 'spreadsheet_id' not in st.session_state:
+        st.session_state.spreadsheet_id = ""
+    if 'spreadsheet_name' not in st.session_state:
+        st.session_state.spreadsheet_name = ""
+    if 'google_credentials' not in st.session_state:
+        st.session_state.google_credentials = None
 
+    # Verifica se o usuário está logado
     if not st.session_state.user_id:
         st.error("Nenhum usuário logado. Faça login primeiro.")
         return
@@ -146,8 +173,24 @@ def process_pdfs(uploaded_files):
     status_text = st.empty()
 
     for i, uploaded_file in enumerate(uploaded_files):
-        logging.info(f"Processando PDF {i+1}/{len(uploaded_files)}: {uploaded_file.name}")
-        # ... resto do código ...
+        # Atualiza progresso
+        progress = (i + 1) / len(uploaded_files)
+        progress_bar.progress(progress)
+        status_text.text(f"Processando {i+1}/{len(uploaded_files)}: {uploaded_file.name}...")
+        
+        # Salva o arquivo temporariamente
+        temp_path = os.path.join(file_manager.settings.PDF_TO_PROCESS, uploaded_file.name)
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        # Processa o PDF
+        success, message = process_pdf_thread(
+            temp_path, 
+            st.session_state.user_id, 
+            st.session_state.username,
+            status_text
+        )
+        results.append(message)
     
     # Atualiza o estado da sessão com os resultados
     st.session_state.processing_status = "completed"
