@@ -134,15 +134,61 @@ class PDFProcessor:
         return "NÃO ENCONTRADO"
     
     def _extract_with_ocr(self, field_name):
-        """Tenta extrair usando OCR (Tesseract) para PDFs escaneados"""
-        if not self.settings.USE_OCR:
-            return "NÃO ENCONTRADO"
+    """Tenta extrair usando OCR (Tesseract) para PDFs escaneados"""
+    if not self.settings.USE_OCR:
+        return "NÃO ENCONTRADO"
+    
+    # Use a lógica de OCR para extrair
+    ocr_text = OCRHandler.process_pdf(self.pdf_path, self.settings.MAX_PAGES)
+    
+    # Tente extrair com o texto do OCR
+    extracted = ExtractionPatterns.extract_field(field_name, ocr_text)
+    
+    # Se ainda não for encontrado, tente com palavras-chave
+    if extracted == "NÃO ENCONTRADO":
+        keywords = {
+            "Orgão": ["órgão", "entidade", "prefeitura", "secretaria", "governo"],
+            "CNPJ Órgão": ["cnpj", "inscrição", "código"],
+            "Cidade e Estado": ["município", "cidade", "estado", "uf", "localização"],
+            "Nº Pregão e Processo": ["pregão", "processo", "número", "nº"],
+            "Telefones": ["telefone", "fones", "contato", "lado", "fale conosco"],
+            "E-mail": ["e-mail", "email", "contato", "fale conosco"],
+            "Prazo de pagamento": ["prazo", "pagamento", "vencimento", "pago"],
+            "Plataforma": ["plataforma", "sistema", "ferramenta", "sistema de licitação"],
+            "UASG": ["uasg", "código uasg", "código uasg"],
+            "Modalidade de compra": ["modalidade", "tipo", "licitação", "compra"],
+            "Prazo de entrega": ["prazo", "entrega", "entregas", "recepção"],
+            "Local de entrega": ["local", "entrega", "recepção", "fornecimento"],
+            "Validade da proposta": ["validade", "proposta", "válido", "prazo"],
+            "Catálogo técnico": ["catálogo", "técnic", "especificação", "ficha"],
+            "Modo de Disputa": ["modo", "disputa", "aberto", "fechado"]
+        }
         
-        # Use a lógica de OCR para extrair
-        ocr_text = OCRHandler.process_pdf(self.pdf_path, self.settings.MAX_PAGES)
+        for keyword in keywords.get(field_name, []):
+            pattern = re.compile(rf"\b{re.escape(keyword)}\b", re.IGNORECASE)
+            matches = pattern.findall(ocr_text)
+            
+            if matches:
+                start_idx = ocr_text.find(matches[0])
+                end_idx = start_idx + len(matches[0])
+                
+                # Busca para a direita
+                for i in range(start_idx, min(start_idx + 200, len(ocr_text))):
+                    if ocr_text[i] in ['\n', ' ', '.', ';', ':', ')', '}', ']', '-', '–', '—', '–']:
+                        end_idx = i
+                        break
+                
+                # Busca para a esquerda
+                for i in range(start_idx - 1, max(0, start_idx - 100), -1):
+                    if ocr_text[i] in ['\n', ' ', '.', ';', ':', '(', '{', '[', '-', '–', '—', '–']:
+                        start_idx = i
+                        break
+                
+                value = ocr_text[start_idx:end_idx].strip()
+                if len(value) > 2:
+                    return value
         
-        # Tente extrair com o texto do OCR
-        return ExtractionPatterns.extract_field(field_name, ocr_text)
+        return "NÃO ENCONTRADO"
     
     def get_edital_number(self):
         """Obtém o número do edital do nome do arquivo ou do texto"""

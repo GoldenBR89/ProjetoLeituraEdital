@@ -4,14 +4,15 @@ import json
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from config.settings import Settings
 from config.user_settings import UserSettings
-import tempfile
+from utils.file_manager import FileManager
 
 class SheetsUploader:
     def __init__(self, user_id=None, username=None):
         self.user_settings = UserSettings(user_id, username)
         self.creds = self._authenticate()
-        self.service = build('sheets', 'v4', credentials=self.creds)
+        self.service = build('sheets', 'v4', credentials=self.creds) if self.creds else None
     
     def _authenticate(self):
         """Autentica com base nas credenciais do usuário logado"""
@@ -26,7 +27,12 @@ class SheetsUploader:
         # Se não tem credenciais válidas, precisa autenticar
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                try:
+                    creds.refresh(Request())
+                except Exception as e:
+                    logger.error(f"Erro ao refresh token: {str(e)}")
+                    return None
+            
             else:
                 # Usa as credenciais do usuário ou as padrão
                 google_credentials = self.user_settings.GOOGLE_CREDENTIALS
@@ -36,11 +42,15 @@ class SheetsUploader:
                         json.dump(json.loads(google_credentials), temp_file)
                         temp_file_path = temp_file.name
                     
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        temp_file_path,
-                        ['https://www.googleapis.com/auth/spreadsheets']
-                    )
-                    os.unlink(temp_file_path)  # Remove o arquivo temporário
+                    try:
+                        flow = InstalledAppFlow.from_client_secrets_file(
+                            temp_file_path,
+                            ['https://www.googleapis.com/auth/spreadsheets']
+                        )
+                        os.unlink(temp_file_path)  # Remove o arquivo temporário
+                    except Exception as e:
+                        logger.error(f"Erro ao criar fluxo OAuth: {str(e)}")
+                        return None
                 else:
                     # Usa credenciais padrão
                     flow = InstalledAppFlow.from_client_secrets_file(
@@ -48,11 +58,16 @@ class SheetsUploader:
                         ['https://www.googleapis.com/auth/spreadsheets']
                     )
                 
-                creds = flow.run_local_server(port=0)
+                try:
+                    creds = flow.run_local_server(port=0)
+                except Exception as e:
+                    logger.error(f"Erro ao autenticar com Google: {str(e)}")
+                    return None
             
             # Salva o token
-            with open(token_path, 'wb') as token:
-                pickle.dump(creds, token)
+            if creds:
+                with open(token_path, 'wb') as token:
+                    pickle.dump(creds, token)
         
         return creds
     
@@ -62,7 +77,7 @@ class SheetsUploader:
         
         if edital_link:
             data["Edital de Licitação"] = edital_link
-        elif "Edital de Licitação" not in data:
+        elif "Edital de Licitação" not in 
             data["Edital de Licitação"] = "LINK_NÃO_FORNECIDO"
         
         batch_data = []
@@ -84,16 +99,20 @@ class SheetsUploader:
                 "data": batch_data
             }
             
+            if self.service is None:
+                logger.error("Serviço do Google Sheets não inicializado.")
+                return False
+            
             result = self.service.spreadsheets().values().batchUpdate(
                 spreadsheetId=spreadsheet_id,
                 body=body
             ).execute()
             
-            print(f"✅ {len(batch_data)} campos atualizados na planilha!")
+            logger.info(f"✅ {len(batch_data)} campos atualizados na planilha!")
             return True
             
         except Exception as e:
-            print(f"❌ Erro ao atualizar planilha: {str(e)}")
+            logger.error(f"❌ Erro ao atualizar planilha: {str(e)}")
             return False
     
     def clear_sheet(self):
@@ -108,6 +127,10 @@ class SheetsUploader:
             })
         
         try:
+            if self.service is None:
+                logger.error("Serviço do Google Sheets não inicializado.")
+                return False
+            
             body = {
                 "valueInputOption": "USER_ENTERED",
                 "data": batch_data
@@ -118,8 +141,8 @@ class SheetsUploader:
                 body=body
             ).execute()
             
-            print("✅ Planilha limpa para novo edital!")
+            logger.info("✅ Planilha limpa para novo edital!")
             return True
         except Exception as e:
-            print(f"❌ Erro ao limpar planilha: {str(e)}")
+            logger.error(f"❌ Erro ao limpar planilha: {str(e)}")
             return False

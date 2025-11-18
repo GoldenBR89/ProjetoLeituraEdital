@@ -11,9 +11,13 @@ class OCRHandler:
         
         if os.name == 'nt':  # Windows
             pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_PATH
+        elif os.name == 'posix':  # Linux/Mac
+            # Tesseract geralmente está no caminho padrão
+            pass
     
     @staticmethod
     def process_pdf(pdf_path, max_pages=3):
+        """Processa PDF com OCR e retorna texto"""
         try:
             OCRHandler.setup_tesseract()
             
@@ -31,9 +35,11 @@ class OCRHandler:
             for i, image in enumerate(images):
                 print(f"  📄 Processando página {i+1}/{min(max_pages, len(images))} com OCR...")
                 
-                image = image.convert('L')
-                image = image.point(lambda x: 0 if x < 140 else 255, '1')
+                # Pré-processamento da imagem
+                image = image.convert('L')  # Converte para escala de cinza
+                image = image.point(lambda x: 0 if x < 140 else 255, '1')  # Binarização
                 
+                # Extração do texto
                 text = pytesseract.image_to_string(
                     image,
                     lang='por',
