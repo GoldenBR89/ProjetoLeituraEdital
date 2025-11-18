@@ -7,22 +7,33 @@ from google.auth.transport.requests import Request
 from config.settings import Settings
 from config.user_settings import UserSettings
 from utils.file_manager import FileManager
+import logging
+import tempfile
+import sys
+
+logger = logging.getLogger(__name__)
 
 class SheetsUploader:
     def __init__(self, user_id=None, username=None):
         self.user_settings = UserSettings(user_id, username)
         self.creds = self._authenticate()
-        self.service = build('sheets', 'v4', credentials=self.creds) if self.creds else None
+        self.service = self._get_service()
     
     def _authenticate(self):
         """Autentica com base nas credenciais do usuário logado"""
         creds = None
         token_path = f'token_{self.user_settings.user_id}.pickle' if self.user_settings.user_id else 'token.pickle'
         
-        # Tenta carregar token existente
+        # Verifica se o token existe
         if os.path.exists(token_path):
-            with open(token_path, 'rb') as token:
-                creds = pickle.load(token)
+            try:
+                with open(token_path, 'rb') as token:
+                    creds = pickle.load(token)
+            except Exception as e:
+                logger.error(f"Erro ao carregar token: {str(e)}")
+                # Se o token estiver corrompido, apague-o
+                os.remove(token_path)
+                creds = None
         
         # Se não tem credenciais válidas, precisa autenticar
         if not creds or not creds.valid:
@@ -59,7 +70,22 @@ class SheetsUploader:
                     )
                 
                 try:
-                    creds = flow.run_local_server(port=0)
+                    # Cria a URL de autenticação
+                    auth_url = flow.authorization_url(
+                        access_type='offline',
+                        prompt='consent'
+                    )
+                    logger.info(f"Por favor, visite este URL para autenticar a aplicação: {auth_url[0]}")
+                    print("Por favor, visite este URL para autenticar a aplicação:", auth_url[0])
+                    
+                    # Aguarda a autenticação
+                    auth_url = flow.authorization_url(
+                        access_type='offline',
+                        prompt='consent'
+                    )
+                    print("Aguarde a autenticação...")
+                    code = input("Insira o código de autorização: ")
+                    creds = flow.fetch_token(code=code)
                 except Exception as e:
                     logger.error(f"Erro ao autenticar com Google: {str(e)}")
                     return None
@@ -71,13 +97,30 @@ class SheetsUploader:
         
         return creds
     
+    def _get_service(self):
+        """Obtém o serviço do Google Sheets"""
+        if self.creds is None:
+            logger.error("Credenciais não autenticadas. Tente autenticar novamente.")
+            return None
+        
+        try:
+            # Tenta construir o serviço do Google Sheets
+            return build('sheets', 'v4', credentials=self.creds)
+        except Exception as e:
+            logger.error(f"Erro ao criar o serviço do Google Sheets: {str(e)}")
+            return None
+    
     def update_sheet(self, data, edital_link=None):
         """Atualiza a planilha com dados extraídos"""
+        if self.service is None:
+            logger.error("Serviço do Google Sheets não inicializado. Tente autenticar novamente.")
+            return False
+        
         spreadsheet_id = self.user_settings.SPREADSHEET_ID
         
         if edital_link:
             data["Edital de Licitação"] = edital_link
-        elif "Edital de Licitação" not in 
+        elif "Edital de Licitação" not in data:
             data["Edital de Licitação"] = "LINK_NÃO_FORNECIDO"
         
         batch_data = []
@@ -99,10 +142,6 @@ class SheetsUploader:
                 "data": batch_data
             }
             
-            if self.service is None:
-                logger.error("Serviço do Google Sheets não inicializado.")
-                return False
-            
             result = self.service.spreadsheets().values().batchUpdate(
                 spreadsheetId=spreadsheet_id,
                 body=body
@@ -117,6 +156,10 @@ class SheetsUploader:
     
     def clear_sheet(self):
         """Limpa os campos da planilha para novo edital"""
+        if self.service is None:
+            logger.error("Serviço do Google Sheets não inicializado. Tente autenticar novamente.")
+            return False
+        
         spreadsheet_id = self.user_settings.SPREADSHEET_ID
         batch_data = []
         
@@ -127,10 +170,6 @@ class SheetsUploader:
             })
         
         try:
-            if self.service is None:
-                logger.error("Serviço do Google Sheets não inicializado.")
-                return False
-            
             body = {
                 "valueInputOption": "USER_ENTERED",
                 "data": batch_data
