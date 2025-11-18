@@ -1,9 +1,11 @@
+# app.py
 import streamlit as st
 import os
 import json
-import threading
 import time
-import bcrypt
+import threading
+import base64
+import tempfile
 from pathlib import Path
 from database.init_db import DatabaseManager
 from config.user_settings import UserSettings
@@ -11,14 +13,12 @@ from core.pdf_processor import PDFProcessor
 from core.sheets_uploader import SheetsUploader
 from utils.file_manager import FileManager
 from datetime import datetime
+import logging
+from streamlit import experimental_rerun as rerun  # Atualizado para versões recentes
 
-# Configuração inicial
-st.set_page_config(
-    page_title="Extrator de Editais - Multi-Usuário",
-    page_icon="📄",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Configuração inicial do logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Inicializa o banco de dados
 db_manager = DatabaseManager()
@@ -62,6 +62,8 @@ def init_session_state():
         st.session_state.spreadsheet_name = ""
     if 'google_credentials' not in st.session_state:
         st.session_state.google_credentials = None
+    if 'last_processed' not in st.session_state:
+        st.session_state.last_processed = {}
 
 def login_user(username, password):
     """Realiza o login do usuário"""
@@ -87,6 +89,8 @@ def login_user(username, password):
         else:
             st.session_state.needs_credentials = False
         
+        # Atualiza o estado da sessão
+        st.rerun()
         return True
     return False
 
@@ -103,16 +107,21 @@ def create_user(username, name, email, password):
         st.session_state.authentication_status = True
         st.session_state.needs_spreadsheet_config = True
         st.session_state.needs_credentials = True
+        st.rerun()
         return True
     return False
 
-def process_pdf_thread(pdf_path, user_id, username, log_placeholder):
-    """Processa um PDF em uma thread separada"""
+def process_pdf(pdf_path, user_id, username):
+    """Processa um único PDF"""
     try:
+        logger.info(f"Iniciando processamento do PDF: {pdf_path}")
         processor = PDFProcessor(pdf_path)
         extracted_data = processor.extract_all_fields()
         
+        # Configura as credenciais do Google e a planilha do usuário
+        user_settings = UserSettings(user_id, username)
         uploader = SheetsUploader(user_id, username)
+        
         success = uploader.update_sheet(extracted_data)
         
         file_manager = FileManager()
@@ -123,41 +132,14 @@ def process_pdf_thread(pdf_path, user_id, username, log_placeholder):
         else:
             return False, f"❌ Erro ao enviar para planilha: {os.path.basename(pdf_path)}"
     except Exception as e:
+        logger.error(f"Erro ao processar {pdf_path}: {str(e)}")
         return False, f"❌ Erro ao processar {os.path.basename(pdf_path)}: {str(e)}"
 
-import logging
-logging.basicConfig(level=logging.INFO)
-
 def process_pdfs(uploaded_files):
-    """Função principal para processar múltiplos PDFs"""
-    # Inicializa o estado da sessão (crucial para threads)
-    if 'user_id' not in st.session_state:
-        st.session_state.user_id = None
-    if 'username' not in st.session_state:
-        st.session_state.username = None
-    if 'user_name' not in st.session_state:
-        st.session_state.user_name = None
-    if 'user_email' not in st.session_state:
-        st.session_state.user_email = None
-    if 'authentication_status' not in st.session_state:
-        st.session_state.authentication_status = None
-    if 'new_user' not in st.session_state:
-        st.session_state.new_user = False
-    if 'needs_credentials' not in st.session_state:
-        st.session_state.needs_credentials = False
-    if 'needs_spreadsheet_config' not in st.session_state:
-        st.session_state.needs_spreadsheet_config = False
-    if 'processing_status' not in st.session_state:
-        st.session_state.processing_status = None
-    if 'processing_results' not in st.session_state:
-        st.session_state.processing_results = []
-    if 'spreadsheet_id' not in st.session_state:
-        st.session_state.spreadsheet_id = ""
-    if 'spreadsheet_name' not in st.session_state:
-        st.session_state.spreadsheet_name = ""
-    if 'google_credentials' not in st.session_state:
-        st.session_state.google_credentials = None
-
+    """Processa múltiplos PDFs"""
+    # Inicializa o estado da sessão
+    init_session_state()
+    
     # Verifica se o usuário está logado
     if not st.session_state.user_id:
         st.error("Nenhum usuário logado. Faça login primeiro.")
@@ -171,38 +153,47 @@ def process_pdfs(uploaded_files):
     results = []
     progress_bar = st.progress(0)
     status_text = st.empty()
-
-    for i, uploaded_file in enumerate(uploaded_files):
-        # Atualiza progresso
-        progress = (i + 1) / len(uploaded_files)
-        progress_bar.progress(progress)
-        status_text.text(f"Processando {i+1}/{len(uploaded_files)}: {uploaded_file.name}...")
-        
-        # Salva o arquivo temporariamente
-        temp_path = os.path.join(file_manager.settings.PDF_TO_PROCESS, uploaded_file.name)
-        with open(temp_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        
-        # Processa o PDF
-        success, message = process_pdf_thread(
-            temp_path, 
-            st.session_state.user_id, 
-            st.session_state.username,
-            status_text
-        )
-        results.append(message)
+    
+    # Use um spinner para indicar que o processamento está em andamento
+    with st.spinner("Processando PDFs..."):
+        for i, uploaded_file in enumerate(uploaded_files):
+            # Atualiza progresso
+            progress = (i + 1) / len(uploaded_files)
+            progress_bar.progress(progress)
+            status_text.text(f"Processando {i+1}/{len(uploaded_files)}: {uploaded_file.name}...")
+            
+            # Salva o arquivo temporariamente
+            temp_path = os.path.join(file_manager.settings.PDF_TO_PROCESS, uploaded_file.name)
+            with open(temp_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            # Processa o PDF (SEM THREAD - a única abordagem correta no Streamlit)
+            success, message = process_pdf(
+                temp_path, 
+                st.session_state.user_id, 
+                st.session_state.username
+            )
+            results.append(message)
     
     # Atualiza o estado da sessão com os resultados
     st.session_state.processing_status = "completed"
     st.session_state.processing_results = results
     progress_bar.empty()
     status_text.empty()
+    st.rerun()  # Força uma atualização da interface
 
-# Página principal
 def main_app():
+    # Inicializa o estado da sessão
     init_session_state()
     
     # Cabeçalho
+    st.set_page_config(
+        page_title="Extrator de Editais - Multi-Usuário",
+        page_icon="📄",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
     st.title("📄 Extrator de Editais - Multi-Usuário")
     st.markdown(f"Bem-vindo, **{st.session_state.user_name}**! Versão: 2.0")
     
@@ -222,7 +213,8 @@ def main_app():
             
             if st.button("🚪 Logout"):
                 for key in list(st.session_state.keys()):
-                    del st.session_state[key]
+                    if key not in ["user_id", "username", "user_name", "user_email"]:
+                        del st.session_state[key]
                 st.rerun()
         
         else:
@@ -328,15 +320,8 @@ def main_app():
             st.success(f"✅ {len(uploaded_files)} arquivo(s) PDF selecionado(s).")
             
             if st.button("⚡ Processar Todos os PDFs", key="process_btn"):
-                # Inicia o processamento em uma thread separada
-                processing_thread = threading.Thread(
-                    target=process_pdfs,
-                    args=(uploaded_files,),
-                    daemon=True
-                )
-                processing_thread.start()
-                st.session_state.processing_status = "processing"
-                st.info("🔄 Processamento iniciado em segundo plano...")
+                # Inicia o processamento (sem threads)
+                process_pdfs(uploaded_files)
         
         # Mostra resultados do processamento
         if st.session_state.processing_status == "completed":
