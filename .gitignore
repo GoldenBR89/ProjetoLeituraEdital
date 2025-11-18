@@ -3,6 +3,13 @@ token.pickle
 credentials.json
 .env
 .env.local
+token_1.pickle
+token_2.pickle
+token_3.pickle
+token_4.pickle
+token_5.pickle
+token_6.pickle
+token_7.pickle
 
 # Ambientes virtuais Python
 venv/

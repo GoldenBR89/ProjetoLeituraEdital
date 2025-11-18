@@ -6,6 +6,7 @@ import time
 import threading
 import base64
 import tempfile
+import bcrypt
 from pathlib import Path
 from database.init_db import DatabaseManager
 from config.user_settings import UserSettings
@@ -14,7 +15,7 @@ from core.sheets_uploader import SheetsUploader
 from utils.file_manager import FileManager
 from datetime import datetime
 import logging
-from streamlit import experimental_rerun as rerun  # Atualizado para versões recentes
+from streamlit import rerun
 
 # Configuração inicial do logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
