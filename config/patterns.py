@@ -2,7 +2,7 @@ import re
 
 class ExtractionPatterns:
     """Padrões regex especializados para extração de editais brasileiros com base em variações reais"""
-    
+
     COMMON_PATTERNS = {
         # Orgão - Várias formas comuns
         "orgao_1": r"ÓRGÃO\s*[:\s]*([A-Z][A-Za-z\s\.\-]+)",
@@ -22,7 +22,8 @@ class ExtractionPatterns:
         "cidade_estado_1": r"([\w\s\-]+)\s*[-–]\s*(?:Estado do|do|da|de)\s*([\w\s]+)",
         "cidade_estado_2": r"([\w\s\-]+)\s*-\s*([A-Z]{2})\b",
         "cidade_estado_3": r"Local\s+de\s+Entrega\s*[:\s]*([\w\s\-]+)\s*,\s*([A-Z]{2})\b",
-        "cidade_estado_4": r"Município:\s*([\w\s\-]+)\s*-\s*([A-Z]{2})\b",
+        "cidade_estado_4": r"Município:\s*([\w\s\-]+)\s*-\s*UF:\s*([^\n]+)",
+        "cidade_estado_5": r"Endereço\s+de\s+entrega\s*[:\s]*([^\n]+)",
         
         # Nº Pregão e Processo - Vários formatos
         "processo_1": r"Processo\s+Administrativo\s*[:\s]*No\s*([\d\./\-]+)",
@@ -31,6 +32,7 @@ class ExtractionPatterns:
         "pregao_1": r"PREGÃO\s+ELETRÔNICO\s+No\s+([\d\./\-]+)",
         "pregao_2": r"Processo\s+de\s+Pregão\s*[:\s]*No\s*([\d\./\-]+)",
         "pregao_3": r"Nº\s+do\s+Pregão\s*[:\s]*([\d\./\-]+)",
+        "processo_pregao_1": r"PROCESSO\s+ADMINISTRATIVO\s+No\s+([\d\./\-]+)\s*\|\s*PREGÃO\s+ELETRÔNICO\s+No\s+([\d\./\-]+)",
         
         # Telefones - Vários formatos
         "telefone_1": r"Fone\s*[:\s]*\((\d{2})\)\s*(\d{4,5})[-\s]*(\d{4})",
@@ -49,7 +51,7 @@ class ExtractionPatterns:
         "prazo_pagamento_3": r"(\d+)\s+dias\s+após\s+a\s+entrega",
         
         # Plataforma - Vários sistemas comuns
-        "plataforma_1": r"Plataforma\s+de\s+Licitação\s*[:\s]*(Bolsa\s+de\s+Licitações|BLL|Comprasnet|Portal\s+de\s+Compras\s+Públicas|LICITAÇÃO|PREGÃO|BANRISUL|BANDEP|BANPARÁ|BANESPA|BANESPS|BANESTES|BANPARÁ|BANRISUL|BANESPA|BANESPS|BANESTES)",
+        "plataforma_1": r"Plataforma\s+de\s+Licitação\s*[:\s]*(Bolsa\s+de\s+Licitações|BLL|Comprasnet|Portal\s+de\s+Compras\s+Públicas|LICITAÇÃO|PREGÃO|BANRISUL|BANDEP|BANPARÁ|BANESPA|BANESPS|BANESTES)",
         "plataforma_2": r"Plataforma\s+eletrônica\s*[:\s]*(Bolsa\s+de\s+Licitações|BLL|Comprasnet|Portal\s+de\s+Compras\s+Públicas)",
         "plataforma_3": r"Plataforma\s+de\s+Pregão\s+Eletrônico\s*[:\s]*(Bolsa\s+de\s+Licitações|BLL|Comprasnet)",
         
@@ -86,9 +88,9 @@ class ExtractionPatterns:
         "catalogo_tecnico_4": r"É\s+necessário\s+fornecer\s+catálogo\s+técnico",
         
         # Modo de Disputa
-        "modo_disputa_1": r"Modo\s+de\s+disputa\s*[:\s]*(Aberto|Fechar|Aberto e Fechado)",
-        "modo_disputa_2": r"Disputa\s+em\s+duas\s+fases\s*[:\s]*(Aberto|Fechar|Aberto e Fechado)",
-        "modo_disputa_3": r"MODALIDADE\s+DE\s+DISPUTA\s*[:\s]*(Aberto|Fechar|Aberto e Fechado)",
+        "modo_disputa_1": r"Modo\s+de\s+disputa\s*[:\s]*(Aberto|Fechado|Aberto e Fechado)",
+        "modo_disputa_2": r"Disputa\s+em\s+duas\s+fases\s*[:\s]*(Aberto|Fechado|Aberto e Fechado)",
+        "modo_disputa_3": r"MODALIDADE\s+DE\s+DISPUTA\s*[:\s]*(Aberto|Fechado|Aberto e Fechado)",
         "modo_disputa_4": r"MODO\s+DE\s+DISPUTA\s+ABERTO",
         "modo_disputa_5": r"MODO\s+DE\s+DISPUTA\s+ABERTO E FECHADO",
     }
@@ -99,8 +101,8 @@ class ExtractionPatterns:
         patterns = {
             "Orgão": ["orgao_1", "orgao_2", "orgao_3", "orgao_4", "orgao_5", "orgao_6"],
             "CNPJ Órgão": ["cnpj_1", "cnpj_2", "cnpj_3", "cnpj_4"],
-            "Cidade e Estado": ["cidade_estado_1", "cidade_estado_2", "cidade_estado_3", "cidade_estado_4"],
-            "Nº Pregão e Processo": ["processo_1", "processo_2", "processo_3", "pregao_1", "pregao_2", "pregao_3"],
+            "Cidade e Estado": ["cidade_estado_1", "cidade_estado_2", "cidade_estado_3", "cidade_estado_4", "cidade_estado_5"],
+            "Nº Pregão e Processo": ["processo_1", "processo_2", "processo_3", "pregao_1", "pregao_2", "pregao_3", "processo_pregao_1"],
             "Telefones": ["telefone_1", "telefone_2", "telefone_3", "telefone_4"],
             "E-mail": ["email_1", "email_2", "email_3"],
             "Prazo de pagamento": ["prazo_pagamento_1", "prazo_pagamento_2", "prazo_pagamento_3"],
@@ -120,11 +122,14 @@ class ExtractionPatterns:
             match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
             if match:
                 # Processamento especial para campos compostos
-                if field_name == "Nº Pregão e Processo" and match.groups():
-                    # Retorna os valores encontrados em um formato padronizado
-                    if len(match.groups()) >= 1:
-                        return f"PROCESSO ADMINISTRATIVO No {match.group(1)} | PREGÃO ELETRÔNICO No {match.group(1)}"
-                    return f"PROCESSO ADMINISTRATIVO No {match.group(1)}"
+                if field_name == "Nº Pregão e Processo":
+                    if len(match.groups()) >= 2:
+                        processo = match.group(1).strip()
+                        pregao = match.group(2).strip()
+                        return f"PROCESSO ADMINISTRATIVO No {processo} | PREGÃO ELETRÔNICO No {pregao}"
+                    elif len(match.groups()) >= 1:
+                        return f"PROCESSO ADMINISTRATIVO No {match.group(1)}"
+                    return "NÃO ENCONTRADO"
                 
                 # Processamento especial para Cidade e Estado
                 elif field_name == "Cidade e Estado" and len(match.groups()) >= 2:
@@ -132,21 +137,21 @@ class ExtractionPatterns:
                     estado = match.group(2).strip()
                     return f"{cidade} - {estado}"
                 
-                # Processamento especial para Telefones
+                # Processamento especial for Telefones
                 elif field_name == "Telefones" and len(match.groups()) >= 3:
                     return f"({match.group(1)}) {match.group(2)}-{match.group(3)}"
                 elif field_name == "Telefones" and match.groups():
                     return match.group(0).strip()
                 
-                # Processamento especial para Prazo de entrega
+                # Processamento especial for Prazo de entrega
                 elif field_name == "Prazo de entrega" and match.groups():
                     return f"{match.group(1)} dias úteis"
                 
-                # Processamento especial para Catálogo técnico
+                # Processamento especial for Catálogo técnico
                 elif field_name == "Catálogo técnico" and match.groups():
                     return "Precisa de catálogo técnico"
                 
-                # Processamento especial para Modo de Disputa
+                # Processamento especial for Modo de Disputa
                 elif field_name == "Modo de Disputa" and match.groups():
                     return f"Modo de Disputa: {match.group(1)}"
                 
