@@ -8,14 +8,12 @@ class FileManager:
         self._create_directories()
     
     def _create_directories(self):
-        """Cria diretórios necessários se não existirem"""
         for directory in [self.settings.PDF_TO_PROCESS, self.settings.PDF_PROCESSED]:
             if not os.path.exists(directory):
                 os.makedirs(directory)
                 print(f"📁 Diretório criado: {directory}")
     
     def get_pending_pdfs(self):
-        """Retorna lista de PDFs pendentes de processamento"""
         pdf_files = []
         for file in os.listdir(self.settings.PDF_TO_PROCESS):
             if file.lower().endswith('.pdf'):
@@ -23,13 +21,11 @@ class FileManager:
         return pdf_files
     
     def move_to_processed(self, pdf_path, edital_number):
-        """Move arquivo processado para pasta de processados"""
         try:
             filename = os.path.basename(pdf_path)
             new_filename = f"{edital_number}_{filename}" if edital_number else filename
             dest_path = os.path.join(self.settings.PDF_PROCESSED, new_filename)
             
-            # Garante nome único
             counter = 1
             while os.path.exists(dest_path):
                 name_parts = new_filename.rsplit('.', 1)
@@ -45,8 +41,6 @@ class FileManager:
             return False
     
     def organize_files(self):
-        """Organiza arquivos nas pastas corretas"""
-        # Move todos os PDFs da raiz para pasta de processamento
         for file in os.listdir('.'):
             if file.lower().endswith('.pdf') and file != 'credentials.json':
                 dest = os.path.join(self.settings.PDF_TO_PROCESS, file)

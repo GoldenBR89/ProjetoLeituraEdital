@@ -1,9 +1,6 @@
 import re
 
 class ExtractionPatterns:
-    """Padrões regex especializados para extração de editais brasileiros"""
-    
-    # Padrões universais para documentos governamentais
     COMMON_PATTERNS = {
         "orgao_1": r"ORGÃO:\s*([^\n]+)",
         "orgao_2": r"ENTIDADE:\s*([^\n]+)",
@@ -30,7 +27,6 @@ class ExtractionPatterns:
     
     @classmethod
     def extract_field(cls, field_name, text):
-        """Extrai um campo específico usando múltiplos padrões de fallback"""
         patterns = {
             "Orgão": ["orgao_1", "orgao_2", "orgao_3"],
             "CNPJ Órgão": ["cnpj_1", "cnpj_2"],
@@ -54,10 +50,8 @@ class ExtractionPatterns:
             pattern = cls.COMMON_PATTERNS[pattern_name]
             match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
             if match:
-                # Processamento especial para campos compostos
                 if field_name == "Nº Pregão e Processo":
                     processo = match.group(1) if match.groups() else ""
-                    # Buscar número do pregão separadamente
                     pregao_match = re.search(cls.COMMON_PATTERNS["pregao_1"], text, re.IGNORECASE)
                     pregao = pregao_match.group(1) if pregao_match else ""
                     return f"PROCESSO ADMINISTRATIVO No {processo} | PREGÃO ELETRÔNICO No {pregao}"
