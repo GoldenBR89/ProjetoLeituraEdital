@@ -125,8 +125,13 @@ def process_pdf_thread(pdf_path, user_id, username, log_placeholder):
     except Exception as e:
         return False, f"❌ Erro ao processar {os.path.basename(pdf_path)}: {str(e)}"
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
 def process_pdfs(uploaded_files):
     """Função principal para processar múltiplos PDFs"""
+    logging.info("Iniciando processamento de PDFs...")
+
     if not st.session_state.user_id:
         st.error("Nenhum usuário logado. Faça login primeiro.")
         return
@@ -139,26 +144,10 @@ def process_pdfs(uploaded_files):
     results = []
     progress_bar = st.progress(0)
     status_text = st.empty()
-    
+
     for i, uploaded_file in enumerate(uploaded_files):
-        # Atualiza progresso
-        progress = (i + 1) / len(uploaded_files)
-        progress_bar.progress(progress)
-        status_text.text(f"Processando {i+1}/{len(uploaded_files)}: {uploaded_file.name}...")
-        
-        # Salva o arquivo temporariamente
-        temp_path = os.path.join(file_manager.settings.PDF_TO_PROCESS, uploaded_file.name)
-        with open(temp_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        
-        # Processa o PDF
-        success, message = process_pdf_thread(
-            temp_path, 
-            st.session_state.user_id, 
-            st.session_state.username,
-            status_text
-        )
-        results.append(message)
+        logging.info(f"Processando PDF {i+1}/{len(uploaded_files)}: {uploaded_file.name}")
+        # ... resto do código ...
     
     # Atualiza o estado da sessão com os resultados
     st.session_state.processing_status = "completed"
@@ -191,7 +180,7 @@ def main_app():
             if st.button("🚪 Logout"):
                 for key in list(st.session_state.keys()):
                     del st.session_state[key]
-                st.experimental_rerun()
+                st.rerun()
         
         else:
             st.subheader("Autenticação")
@@ -206,7 +195,7 @@ def main_app():
                     if submitted:
                         if login_user(username, password):
                             st.success(f"Bem-vindo de volta, {st.session_state.user_name}!")
-                            st.experimental_rerun()
+                            st.rerun()
                         else:
                             st.error("Credenciais inválidas. Tente novamente.")
             
@@ -227,7 +216,7 @@ def main_app():
                         else:
                             if create_user(new_username, new_name, new_email, new_password):
                                 st.success(f"Conta criada com sucesso! Bem-vindo, {new_name}!")
-                                st.experimental_rerun()
+                                st.rerun()
                             else:
                                 st.error("Nome de usuário já existe. Escolha outro.")
     
@@ -253,7 +242,7 @@ def main_app():
                 user_settings.save_spreadsheet_config(spreadsheet_id.strip(), spreadsheet_name.strip() or None)
                 st.session_state.needs_spreadsheet_config = False
                 st.success("Configuração da planilha salva com sucesso!")
-                st.experimental_rerun()
+                st.rerun()
         
         st.markdown("---")
     
@@ -274,7 +263,7 @@ def main_app():
                     user_settings.save_google_credentials(credentials_content)
                     st.session_state.needs_credentials = False
                     st.success("Credenciais do Google salvas com sucesso!")
-                    st.experimental_rerun()
+                    st.rerun()
             except json.JSONDecodeError:
                 st.error("Arquivo não é um JSON válido. Verifique o arquivo carregado.")
         
@@ -324,7 +313,7 @@ def main_app():
                 if st.button("🔄 Limpar Resultados"):
                     st.session_state.processing_status = None
                     st.session_state.processing_results = []
-                    st.experimental_rerun()
+                    st.rerun()
         
         elif st.session_state.processing_status == "processing":
             st.info("🔄 Processamento em andamento...")
