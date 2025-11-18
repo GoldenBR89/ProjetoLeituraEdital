@@ -1,89 +1,117 @@
 import re
 
 class ExtractionPatterns:
-    """Padrões regex especializados para extração de editais brasileiros"""
+    """Padrões regex especializados para extração de editais brasileiros com base em variações reais"""
     
     COMMON_PATTERNS = {
-        # Padrões para Orgão
-        "orgao_1": r"ORGÃO:\s*([^\n]+)",
-        "orgao_2": r"ENTIDADE:\s*([^\n]+)",
-        "orgao_3": r"ÓRGÃO:\s*([^\n]+)",
-        "orgao_4": r"PREFEITURA\s+MUN\.\s+DE\s+([^\n]+)",  # Ex: PREFEITURA MUN. DE DOM MACEDO COSTA
+        # Orgão - Várias formas comuns
+        "orgao_1": r"ÓRGÃO\s*[:\s]*([A-Z][A-Za-z\s\.\-]+)",
+        "orgao_2": r"ORGÃO\s*[:\s]*([A-Z][A-Za-z\s\.\-]+)",
+        "orgao_3": r"ENTIDADE\s*[:\s]*([A-Z][A-Za-z\s\.\-]+)",
+        "orgao_4": r"PREFEITURA\s+MUNICIPAL\s+DE\s+([A-Z][A-Za-z\s\-]+)",
+        "orgao_5": r"SECRETARIA\s+MUNICIPAL\s+DE\s+[A-Z][a-z\s]+(?:\s+DE\s+[A-Z][a-z\s]+)?\s+DE\s+([A-Z][A-Za-z\s\-]+)",
+        "orgao_6": r"GOVERNO\s+DO\s+ESTADO\s+DE\s+([A-Z][A-Za-z\s\-]+)",
         
-        # Padrões para CNPJ Órgão
+        # CNPJ Órgão - Vários formatos
         "cnpj_1": r"CNPJ\s*[:\s]*([\d\.\-\/]{14,18})",
-        "cnpj_2": r"(?:CNPJ|Cadastro Nacional|Inscrição Estadual)\s*[:\s]*([\d\.\-\/]{14,18})",
-        "cnpj_3": r"CNPJ\s+nº\s*([\d\.\-\/]{14,18})",  # Ex: CNPJ nº 13.827.019/0001-58
+        "cnpj_2": r"CNPJ\s+nº\s*([\d\.\-\/]{14,18})",
+        "cnpj_3": r"INSCRIÇÃO\s+NO\s+CNPJ\s*[:\s]*([\d\.\-\/]{14,18})",
+        "cnpj_4": r"(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})",
         
-        # Padrões para Cidade e Estado
+        # Cidade e Estado - Vários formatos
         "cidade_estado_1": r"([\w\s\-]+)\s*[-–]\s*(?:Estado do|do|da|de)\s*([\w\s]+)",
-        "cidade_estado_2": r"Município:\s*([^\n]+)\s*[-–]\s*UF:\s*([^\n]+)",
-        "cidade_estado_3": r"([\w\s\-]+)\s*-\s*([\w\s]+)",  # Ex: Dom Macedo Costa - BA
+        "cidade_estado_2": r"([\w\s\-]+)\s*-\s*([A-Z]{2})\b",
+        "cidade_estado_3": r"Local\s+de\s+Entrega\s*[:\s]*([\w\s\-]+)\s*,\s*([A-Z]{2})\b",
+        "cidade_estado_4": r"Município:\s*([\w\s\-]+)\s*-\s*([A-Z]{2})\b",
         
-        # Padrões para Nº Pregão e Processo
-        "processo_1": r"PROCESSO\s*[:\s]*([\d\./\-]+)",
-        "processo_2": r"PROCESSO\s+ADMINISTRATIVO\s+No\s+([\d\./\-]+)",  # Ex: PROCESSO ADMINISTRATIVO No 021/2025
-        "pregao_1": r"PREGÃO(?:\s+ELETRÔNICO)?\s*(?:Nº|N\.º|No)\s*([\d\./\-]+)",
-        "pregao_2": r"PREGÃO\s+ELETRÔNICO\s+No\s+([\d\./\-]+)",  # Ex: PREGÃO ELETRÔNICO No 021/2025
+        # Nº Pregão e Processo - Vários formatos
+        "processo_1": r"Processo\s+Administrativo\s*[:\s]*No\s*([\d\./\-]+)",
+        "processo_2": r"PROCESSO\s+ADMINISTRATIVO\s+No\s+([\d\./\-]+)",
+        "processo_3": r"Processo\s+de\s+Compras\s*[:\s]*No\s*([\d\./\-]+)",
+        "pregao_1": r"PREGÃO\s+ELETRÔNICO\s+No\s+([\d\./\-]+)",
+        "pregao_2": r"Processo\s+de\s+Pregão\s*[:\s]*No\s*([\d\./\-]+)",
+        "pregao_3": r"Nº\s+do\s+Pregão\s*[:\s]*([\d\./\-]+)",
         
-        # Padrões para Telefones
-        "telefone_1": r"Telefones?:\s*([\d\(\)\-\s\+]+)",
-        "telefone_2": r"Fone(?:s)?:\s*([\d\(\)\-\s\+]+)",
-        "telefone_3": r"Fone\/Fax:\s*([\d\(\)\-\s\+\/]+)",  # Ex: Fone/Fax: (75)3648-2127/ 3648-2169
+        # Telefones - Vários formatos
+        "telefone_1": r"Fone\s*[:\s]*\((\d{2})\)\s*(\d{4,5})[-\s]*(\d{4})",
+        "telefone_2": r"Telefones?\s*[:\s]*\((\d{2})\)\s*(\d{4,5})[-\s]*(\d{4})",
+        "telefone_3": r"Contato\s*[:\s]*\((\d{2})\)\s*(\d{4,5})[-\s]*(\d{4})",
+        "telefone_4": r"(\(\d{2}\)\s*\d{4,5}[-\s]*\d{4})",
         
-        # Padrões para E-mail (geralmente não encontrado em editais oficiais)
-        "email_1": r"E-mails?:\s*([\w\.\-]+@[\w\.\-]+\.\w+)",
+        # E-mail
+        "email_1": r"E[-]mail\s*[:\s]*([\w\.\-]+@[\w\.\-]+\.\w+)",
+        "email_2": r"e[-]mail\s*[:\s]*([\w\.\-]+@[\w\.\-]+\.\w+)",
+        "email_3": r"contato@[\w\.\-]+\.\w+",
         
-        # Padrões para Prazo de pagamento (muito variável, difícil de padronizar)
-        "prazo_pagamento_1": r"Prazo\s+de\s+pagamento\s*[:\s]*([^\n]+)",
+        # Prazo de pagamento - Vários formatos
+        "prazo_pagamento_1": r"Prazo\s+de\s+pagamento\s*[:\s]*([\d]+)\s+dias\s+após",
+        "prazo_pagamento_2": r"Forma\s+de\s+pagamento\s*[:\s]*([\d]+)\s+dias\s+após",
+        "prazo_pagamento_3": r"(\d+)\s+dias\s+após\s+a\s+entrega",
         
-        # Padrões para Plataforma
-        "plataforma_1": r"Plataforma\s*[:\s]*([^\n]+)",
-        "plataforma_2": r"plataforma\s+eletrônica\s+([^\n]+)",  # Ex: plataforma eletrônica Bolsa de Licitações e Leilões – BLL
+        # Plataforma - Vários sistemas comuns
+        "plataforma_1": r"Plataforma\s+de\s+Licitação\s*[:\s]*(Bolsa\s+de\s+Licitações|BLL|Comprasnet|Portal\s+de\s+Compras\s+Públicas|LICITAÇÃO|PREGÃO|BANRISUL|BANDEP|BANPARÁ|BANESPA|BANESPS|BANESTES|BANPARÁ|BANRISUL|BANESPA|BANESPS|BANESTES)",
+        "plataforma_2": r"Plataforma\s+eletrônica\s*[:\s]*(Bolsa\s+de\s+Licitações|BLL|Comprasnet|Portal\s+de\s+Compras\s+Públicas)",
+        "plataforma_3": r"Plataforma\s+de\s+Pregão\s+Eletrônico\s*[:\s]*(Bolsa\s+de\s+Licitações|BLL|Comprasnet)",
         
-        # Padrões para UASG (muitas vezes não explicitamente marcado como UASG)
+        # UASG
         "uasg_1": r"UASG\s*[:\s]*(\d+)",
+        "uasg_2": r"Código\s+UASG\s*[:\s]*(\d+)",
         
-        # Padrões para Modalidade de compra
-        "modalidade_1": r"MODALIDADE\s*[:\s]*([^\n]+)",
-        "modalidade_2": r"modalidade\s+([^\n]+)",  # Ex: modalidade PREGÃO, PARA REGISTRO DE PREÇO
+        # Modalidade de compra
+        "modalidade_1": r"Modalidade\s+de\s+compra\s*[:\s]*(PREGÃO|DISPENSA|INEXIGIBILIDADE|TOMADA DE PREÇOS|CONCORRÊNCIA|CONVITE|LEILÃO|REGISTRO DE PREÇO)",
+        "modalidade_2": r"Tipo\s+de\s+Licitação\s*[:\s]*(PREGÃO|DISPENSA|INEXIGIBILIDADE|TOMADA DE PREÇOS|CONCORRÊNCIA|CONVITE|LEILÃO|REGISTRO DE PREÇO)",
+        "modalidade_3": r"REGISTRO DE PREÇO",
+        "modalidade_4": r"MODALIDADE\s+DE\s+LICITAÇÃO\s*[:\s]*(PREGÃO|DISPENSA|INEXIGIBILIDADE|TOMADA DE PREÇOS|CONCORRÊNCIA|CONVITE|LEILÃO|REGISTRO DE PREÇO)",
         
-        # Padrões para Prazo de entrega (muito variável)
-        "prazo_entrega_1": r"Prazo\s+de\s+entrega\s*[:\s]*([^\n]+)",
+        # Prazo de entrega
+        "prazo_entrega_1": r"Prazo\s+de\s+entrega\s*[:\s]*([\d]+)\s+dias\s+úteis",
+        "prazo_entrega_2": r"Prazo\s+de\s+entrega\s*[:\s]*([\d]+)\s+dias",
+        "prazo_entrega_3": r"Entrega\s+em\s+até\s+([\d]+)\s+dias",
+        "prazo_entrega_4": r"([\d]+)\s+dias\s+úteis\s+após\s+a\s+ordem\s+de\s+compra",
         
-        # Padrões para Local de entrega (muito variável)
+        # Local de entrega
         "local_entrega_1": r"Local\s+de\s+entrega\s*[:\s]*([^\n]+)",
+        "local_entrega_2": r"Endereço\s+de\s+entrega\s*[:\s]*([^\n]+)",
+        "local_entrega_3": r"Entrega\s+no\s+endereço\s+de\s+[\w\s]+:\s*([^\n]+)",
         
-        # Padrões para Validade da proposta (muito variável)
-        "validade_proposta_1": r"Validade\s+da\s+proposta\s*[:\s]*([^\n]+)",
+        # Validade da proposta
+        "validade_proposta_1": r"Validade\s+da\s+proposta\s*[:\s]*([\d]+)\s+dias",
+        "validade_proposta_2": r"Proposta\s+válida\s+por\s+([\d]+)\s+dias",
+        "validade_proposta_3": r"Validade\s+da\s+proposta\s*[:\s]*([\d]+)\s+dia[s]?",
         
-        # Padrões para Catálogo técnico (muitas vezes não explicitamente marcado)
-        "catalogo_tecnico_1": r"Catálogo\s+técnico\s*[:\s]*([^\n]+)",
+        # Catálogo técnico
+        "catalogo_tecnico_1": r"Catálogo\s+técnico\s*[:\s]*(Sim|Não)",
+        "catalogo_tecnico_2": r"Catálogo\s+técnico\s*[:\s]*(necessário|obrigatório|requisito)",
+        "catalogo_tecnico_3": r"Necessário\s+catálogo\s+técnico\s+para\s+itens\s+específicos",
+        "catalogo_tecnico_4": r"É\s+necessário\s+fornecer\s+catálogo\s+técnico",
         
-        # Padrões para Modo de Disputa
-        "modo_disputa_1": r"Modo\s+de\s+Disputa\s*[:\s]*([^\n]+)",
-        "modo_disputa_2": r"MODO\s+DE\s+DISPUTA\s+([^\n]+)",  # Ex: MODO DE DISPUTA ABERTO E FECHADO
+        # Modo de Disputa
+        "modo_disputa_1": r"Modo\s+de\s+disputa\s*[:\s]*(Aberto|Fechar|Aberto e Fechado)",
+        "modo_disputa_2": r"Disputa\s+em\s+duas\s+fases\s*[:\s]*(Aberto|Fechar|Aberto e Fechado)",
+        "modo_disputa_3": r"MODALIDADE\s+DE\s+DISPUTA\s*[:\s]*(Aberto|Fechar|Aberto e Fechado)",
+        "modo_disputa_4": r"MODO\s+DE\s+DISPUTA\s+ABERTO",
+        "modo_disputa_5": r"MODO\s+DE\s+DISPUTA\s+ABERTO E FECHADO",
     }
     
     @classmethod
     def extract_field(cls, field_name, text):
         """Extrai um campo específico usando múltiplos padrões de fallback"""
         patterns = {
-            "Orgão": ["orgao_1", "orgao_2", "orgao_3", "orgao_4"],
-            "CNPJ Órgão": ["cnpj_1", "cnpj_2", "cnpj_3"],
-            "Cidade e Estado": ["cidade_estado_1", "cidade_estado_2", "cidade_estado_3"],
-            "Nº Pregão e Processo": ["processo_1", "processo_2", "pregao_1", "pregao_2"], # Combina processo e pregão
-            "Telefones": ["telefone_1", "telefone_2", "telefone_3"],
-            "E-mail": ["email_1"],
-            "Prazo de pagamento": ["prazo_pagamento_1"],
-            "Plataforma": ["plataforma_1", "plataforma_2"],
-            "UASG": ["uasg_1"],
-            "Modalidade de compra": ["modalidade_1", "modalidade_2"],
-            "Prazo de entrega": ["prazo_entrega_1"],
-            "Local de entrega": ["local_entrega_1"],
-            "Validade da proposta": ["validade_proposta_1"],
-            "Catálogo técnico": ["catalogo_tecnico_1"],
-            "Modo de Disputa": ["modo_disputa_1", "modo_disputa_2"],
+            "Orgão": ["orgao_1", "orgao_2", "orgao_3", "orgao_4", "orgao_5", "orgao_6"],
+            "CNPJ Órgão": ["cnpj_1", "cnpj_2", "cnpj_3", "cnpj_4"],
+            "Cidade e Estado": ["cidade_estado_1", "cidade_estado_2", "cidade_estado_3", "cidade_estado_4"],
+            "Nº Pregão e Processo": ["processo_1", "processo_2", "processo_3", "pregao_1", "pregao_2", "pregao_3"],
+            "Telefones": ["telefone_1", "telefone_2", "telefone_3", "telefone_4"],
+            "E-mail": ["email_1", "email_2", "email_3"],
+            "Prazo de pagamento": ["prazo_pagamento_1", "prazo_pagamento_2", "prazo_pagamento_3"],
+            "Plataforma": ["plataforma_1", "plataforma_2", "plataforma_3"],
+            "UASG": ["uasg_1", "uasg_2"],
+            "Modalidade de compra": ["modalidade_1", "modalidade_2", "modalidade_3", "modalidade_4"],
+            "Prazo de entrega": ["prazo_entrega_1", "prazo_entrega_2", "prazo_entrega_3", "prazo_entrega_4"],
+            "Local de entrega": ["local_entrega_1", "local_entrega_2", "local_entrega_3"],
+            "Validade da proposta": ["validade_proposta_1", "validade_proposta_2", "validade_proposta_3"],
+            "Catálogo técnico": ["catalogo_tecnico_1", "catalogo_tecnico_2", "catalogo_tecnico_3", "catalogo_tecnico_4"],
+            "Modo de Disputa": ["modo_disputa_1", "modo_disputa_2", "modo_disputa_3", "modo_disputa_4", "modo_disputa_5"],
         }
         
         field_patterns = patterns.get(field_name, [])
@@ -91,18 +119,12 @@ class ExtractionPatterns:
             pattern = cls.COMMON_PATTERNS[pattern_name]
             match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
             if match:
-                # Processamento especial para campos compostos (ex: Nº Pregão e Processo)
-                if field_name == "Nº Pregão e Processo":
-                    processo_match = re.search(cls.COMMON_PATTERNS["processo_2"], text, re.IGNORECASE)
-                    pregao_match = re.search(cls.COMMON_PATTERNS["pregao_2"], text, re.IGNORECASE)
-                    processo = processo_match.group(1) if processo_match else ""
-                    pregao = pregao_match.group(1) if pregao_match else ""
-                    if processo and pregao:
-                        return f"PROCESSO ADMINISTRATIVO No {processo} | PREGÃO ELETRÔNICO No {pregao}"
-                    elif processo:
-                        return f"PROCESSO ADMINISTRATIVO No {processo}"
-                    elif pregao:
-                        return f"PREGÃO ELETRÔNICO No {pregao}"
+                # Processamento especial para campos compostos
+                if field_name == "Nº Pregão e Processo" and match.groups():
+                    # Retorna os valores encontrados em um formato padronizado
+                    if len(match.groups()) >= 1:
+                        return f"PROCESSO ADMINISTRATIVO No {match.group(1)} | PREGÃO ELETRÔNICO No {match.group(1)}"
+                    return f"PROCESSO ADMINISTRATIVO No {match.group(1)}"
                 
                 # Processamento especial para Cidade e Estado
                 elif field_name == "Cidade e Estado" and len(match.groups()) >= 2:
@@ -110,6 +132,25 @@ class ExtractionPatterns:
                     estado = match.group(2).strip()
                     return f"{cidade} - {estado}"
                 
-                return match.group(1).strip() if match.lastindex else match.group(0).strip()
+                # Processamento especial para Telefones
+                elif field_name == "Telefones" and len(match.groups()) >= 3:
+                    return f"({match.group(1)}) {match.group(2)}-{match.group(3)}"
+                elif field_name == "Telefones" and match.groups():
+                    return match.group(0).strip()
+                
+                # Processamento especial para Prazo de entrega
+                elif field_name == "Prazo de entrega" and match.groups():
+                    return f"{match.group(1)} dias úteis"
+                
+                # Processamento especial para Catálogo técnico
+                elif field_name == "Catálogo técnico" and match.groups():
+                    return "Precisa de catálogo técnico"
+                
+                # Processamento especial para Modo de Disputa
+                elif field_name == "Modo de Disputa" and match.groups():
+                    return f"Modo de Disputa: {match.group(1)}"
+                
+                # Retorno padrão
+                return match.group(0).strip()
         
         return "NÃO ENCONTRADO"
