@@ -1,0 +1,29 @@
+# Arquivos de credenciais e configurações locais
+token.pickle
+credentials.json
+.env
+.env.local
+
+# Ambientes virtuais Python
+venv/
+env/
+.venv/
+
+# Arquivos temporários do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de PDF processados (se não quiser versionar)
+data/processed/
+
+# Outros arquivos temporários ou logs
+*.log
+*.tmp
