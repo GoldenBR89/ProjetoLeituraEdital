@@ -12,10 +12,20 @@ class Settings:
     MAX_PAGES = int(os.getenv("MAX_PAGES", "3"))
     RETRY_ATTEMPTS = int(os.getenv("RETRY_ATTEMPTS", "3"))
     CELL_MAPPING = {
-        "Orgão": "B2", "Edital de Licitação": "B3", "CNPJ Órgão": "B4",
-        "Cidade e Estado": "B5", "Nº Pregão e Processo": "B6", "Telefones": "B7",
-        "E-mail": "B8", "Prazo de pagamento": "B9", "Plataforma": "B10",
-        "UASG": "B11", "Modalidade de compra": "F3", "Prazo de entrega": "F4",
-        "Local de entrega": "F5", "Validade da proposta": "F6", "Catálogo técnico": "F7",
-        "Modo de Disputa": "F11"
-    }
+    "Orgão": "E2",
+    "Edital de Licitação": "E3",
+    "CNPJ Órgão": "E4",
+    "Cidade e Estado": "E5",
+    "Nº Pregão e Processo": "E6",
+    "Telefones": "E7",
+    "E-mail": "E8",
+    "Prazo de pagamento": "E9",
+    "Plataforma": "E10",
+    "UASG": "E11",
+    "Modalidade de compra": "G3",
+    "Prazo de entrega": "G4",
+    "Local de entrega": "G5",
+    "Validade da proposta": "G6",
+    "Catálogo técnico": "G7",
+    "Modo de Disputa": "G11"
+}
